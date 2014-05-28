@@ -177,7 +177,7 @@ class faceshiftRcv :
             if (curr_block>=n_blocks):
                 updated=True
 
-    def rcvr():
+    def rcvr(self):
             try:
                 msg = self.sock.recv(4096)
                 #print("Received : " + str(msg))
@@ -199,7 +199,7 @@ class faceshiftRcv :
                     
             return 
 
-    def start_sock():
+    def start_sock(self):
         try:
             print("Creating socket...")
             # The socket listening to incoming data. Its status will be always synchronized with the singleton attribute:
@@ -227,10 +227,11 @@ if __name__ == "__main__":
     pub = rospy.Publisher('faceshift_track', fsMsgTrackingState, queue_size=10)
     rospy.init_node('fs_ros', anonymous=True)
     r = rospy.Rate(10) # 10hz
-    faceshiftRcv.start_sock()
-    updated=false 
+    fs=faceshiftRcv()
+    fs.start_sock()
+    updated=False 
     while not rospy.is_shutdown():
-        faceshiftRcv.rcvr()
+        fs.rcvr()
         if (updated):
 			pub.publish(trackMsg)
 			updated=False
