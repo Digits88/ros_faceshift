@@ -91,7 +91,7 @@ blend_shape_names = [
 
 class faceshiftRcv :
     """This is the receiving Thread listening for FaceShift UDP messages on some port."""
-    def decode_faceshift_datastream(data):
+    def decode_faceshift_datastream(self, data):
         """ Takes as input the bytes of a binary DataStream received via network.
         
          If it is a Tracking State block (ID 33433) then extract some data (info, blendshapes, markers, ...).
@@ -145,8 +145,8 @@ class faceshiftRcv :
                     n_coefficients, = struct.unpack_from('I', data, offset)
                     #print("Blend shapes count="+ str(n_coefficients) )
                     i = 0
-                    #coeff_list = ""
-                    trackMsg.m_coeffs.clear()
+                    coeff_list = ""
+                    #trackMsg.m_coeffs = []
                     while(i < n_coefficients):
                         # Offset of the block, plus the 4 bytes for int n_coefficients, plus 4 bytes per float
                         val, = struct.unpack_from('f', data, offset + 4 + (i*4))
@@ -164,7 +164,7 @@ class faceshiftRcv :
                     n_markers, = struct.unpack_from('H', data, offset)
                     #print("n markers="+str(n_markers))
                     i = 0
-                    trackMsg.m_markers.clear()
+                    trackMsg.m_markers = []
                     while(i < n_markers):
                         # Offset of the block, plus the 2 bytes for int n_markers, plus 4 bytes for each x,y,z floats
                         x, y, z = struct.unpack_from('fff', data, offset + 2 + (i*4*3))
@@ -181,9 +181,7 @@ class faceshiftRcv :
             try:
                 msg = self.sock.recv(4096)
                 #print("Received : " + str(msg))
-                decode_faceshift_datastream(msg)
-
-                 
+                self.decode_faceshift_datastream(msg)
 
             except socket.timeout as to_msg:
                 #print("We know it: " + str(to_msg))
@@ -233,7 +231,8 @@ if __name__ == "__main__":
     while not rospy.is_shutdown():
         fs.rcvr()
         if (updated):
-			pub.publish(trackMsg)
-			updated=False
+            print("UPDATE")
+            pub.publish(trackMsg)
+            updated=False
         r.sleep()
     
