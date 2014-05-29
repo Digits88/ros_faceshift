@@ -13,7 +13,6 @@ import struct
 from ros_faceshift.msg import *
 
 trackMsg=fsMsgTrackingState()
-updated=False
 LISTENING_PORT = 33433
 #BINDING_ADDR = "127.0.0.1"     # Good for local work
 BINDING_ADDR = ''   # Empty string means: bind to all network interfaces
@@ -174,8 +173,7 @@ class faceshiftRcv :
             
                 curr_block += 1
                 offset += block_size
-            if (curr_block>=n_blocks):
-                updated=True
+            self.updated=True
 
     def rcvr(self):
             try:
@@ -227,12 +225,11 @@ if __name__ == "__main__":
     r = rospy.Rate(10) # 10hz
     fs=faceshiftRcv()
     fs.start_sock()
-    updated=False 
+    fs.updated=False 
     while not rospy.is_shutdown():
         fs.rcvr()
-        if (updated):
-            print("UPDATE")
+        if (fs.updated):
             pub.publish(trackMsg)
-            updated=False
+            fs.updated=False
         r.sleep()
     
