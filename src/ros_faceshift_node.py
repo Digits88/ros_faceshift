@@ -145,7 +145,7 @@ class faceshiftRcv :
                     #print("Blend shapes count="+ str(n_coefficients) )
                     i = 0
                     coeff_list = ""
-                    #trackMsg.m_coeffs = []
+                    trackMsg.m_coeffs = []
                     while(i < n_coefficients):
                         # Offset of the block, plus the 4 bytes for int n_coefficients, plus 4 bytes per float
                         val, = struct.unpack_from('f', data, offset + 4 + (i*4))
@@ -201,7 +201,7 @@ class faceshiftRcv :
             # The socket listening to incoming data. Its status will be always synchronized with the singleton attribute:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             #self.sock.setblocking(False)
-            self.sock.settimeout(0.1)
+            #self.sock.settimeout(0.1)
             #self.sock.setsockopt(level, optname, value)
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1500)    # No buffer. We take the latest, if present, or nothing.
             print("Binding...")
@@ -222,7 +222,7 @@ class faceshiftRcv :
 if __name__ == "__main__":
     pub = rospy.Publisher('faceshift_track', fsMsgTrackingState, queue_size=10)
     rospy.init_node('fs_ros', anonymous=True)
-    r = rospy.Rate(10) # 10hz
+    r = rospy.Rate(60) # 10hz
     fs=faceshiftRcv()
     fs.start_sock()
     fs.updated=False 
