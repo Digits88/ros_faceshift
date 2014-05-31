@@ -13,7 +13,6 @@ import struct
 from ros_faceshift.msg import *
 
 trackMsg=fsMsgTrackingState()
-updated=False
 LISTENING_PORT = 33433
 #BINDING_ADDR = "127.0.0.1"     # Good for local work
 BINDING_ADDR = ''   # Empty string means: bind to all network interfaces
@@ -91,7 +90,7 @@ blend_shape_names = [
 
 class faceshiftRcv :
     """This is the receiving Thread listening for FaceShift UDP messages on some port."""
-    def decode_faceshift_datastream(data):
+    def decode_faceshift_datastream(self, data):
         """ Takes as input the bytes of a binary DataStream received via network.
         
          If it is a Tracking State block (ID 33433) then extract some data (info, blendshapes, markers, ...).
@@ -145,8 +144,8 @@ class faceshiftRcv :
                     n_coefficients, = struct.unpack_from('I', data, offset)
                     #print("Blend shapes count="+ str(n_coefficients) )
                     i = 0
-                    #coeff_list = ""
-                    trackMsg.m_coeffs.clear()
+                    coeff_list = ""
+                    trackMsg.m_coeffs = []
                     while(i < n_coefficients):
                         # Offset of the block, plus the 4 bytes for int n_coefficients, plus 4 bytes per float
                         val, = struct.unpack_from('f', data, offset + 4 + (i*4))
@@ -164,7 +163,7 @@ class faceshiftRcv :
                     n_markers, = struct.unpack_from('H', data, offset)
                     #print("n markers="+str(n_markers))
                     i = 0
-                    trackMsg.m_markers.clear()
+                    trackMsg.m_markers = []
                     while(i < n_markers):
                         # Offset of the block, plus the 2 bytes for int n_markers, plus 4 bytes for each x,y,z floats
                         x, y, z = struct.unpack_from('fff', data, offset + 2 + (i*4*3))
@@ -174,16 +173,13 @@ class faceshiftRcv :
             
                 curr_block += 1
                 offset += block_size
-            if (curr_block>=n_blocks):
-                updated=True
+            self.updated=True
 
     def rcvr(self):
             try:
                 msg = self.sock.recv(4096)
                 #print("Received : " + str(msg))
-                decode_faceshift_datastream(msg)
-
-                 
+                self.decode_faceshift_datastream(msg)
 
             except socket.timeout as to_msg:
                 #print("We know it: " + str(to_msg))
@@ -205,7 +201,7 @@ class faceshiftRcv :
             # The socket listening to incoming data. Its status will be always synchronized with the singleton attribute:
             self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             #self.sock.setblocking(False)
-            self.sock.settimeout(0.1)
+            #self.sock.settimeout(0.1)
             #self.sock.setsockopt(level, optname, value)
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_RCVBUF, 1500)    # No buffer. We take the latest, if present, or nothing.
             print("Binding...")
@@ -226,14 +222,14 @@ class faceshiftRcv :
 if __name__ == "__main__":
     pub = rospy.Publisher('faceshift_track', fsMsgTrackingState, queue_size=10)
     rospy.init_node('fs_ros', anonymous=True)
-    r = rospy.Rate(10) # 10hz
+    r = rospy.Rate(60) # 10hz
     fs=faceshiftRcv()
     fs.start_sock()
-    updated=False 
+    fs.updated=False 
     while not rospy.is_shutdown():
         fs.rcvr()
-        if (updated):
-			pub.publish(trackMsg)
-			updated=False
+        if (fs.updated):
+            pub.publish(trackMsg)
+            fs.updated=False
         r.sleep()
     
