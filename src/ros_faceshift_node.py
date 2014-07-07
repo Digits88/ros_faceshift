@@ -10,9 +10,9 @@ import copy
 
 import struct
 
-from ros_faceshift.msg import *
+from pau2motors.msg import pau
 
-trackMsg=fsMsgTrackingState()
+trackMsg=pau()
 LISTENING_PORT = 33433
 #BINDING_ADDR = "127.0.0.1"     # Good for local work
 BINDING_ADDR = ''   # Empty string means: bind to all network interfaces
@@ -112,7 +112,6 @@ class faceshiftRcv :
             #print("n_blocks = " + str(n_blocks))
             offset += 2
 
-            track_ok = 0                # Will be a byte: 1 if tracking ok, 0 otherwise.
             head_rotation_quat = None   # Will be filled with the rotation using mathutils.Quaternion
             blend_shape_values = []     # Will be a list of float in the range 0-1
             #eyes_values = None          # Will be a sequence of 4 angle values
@@ -127,19 +126,15 @@ class faceshiftRcv :
                 offset += 8
             
                 if(block_id == 101):        # Frame Information blobk (timestamp and tracking status)
-                    ts, track_ok = struct.unpack_from('dB', data, offset)
-                    trackMsg.m_timestamp=ts
-                    trackMsg.m_trackingSuccessful=(track_ok==1)
-                    #print("timestamp, track_ok " + str(ts) + ", " + str(track_ok) )
-                    #offset += 9
+                    ts, self.track_ok = struct.unpack_from('dB', data, offset)
                 elif(block_id == 102):      # Pose block (head rotation and position)
                     x,y,z,w = struct.unpack_from('ffff', data, offset)
-                    
+
                     trackMsg.m_headRotation.x = x
                     trackMsg.m_headRotation.y = y
                     trackMsg.m_headRotation.z = z
                     trackMsg.m_headRotation.w = w
-                    
+
                 elif(block_id == 103):      # Blendshapes block (blendshape values)
                     n_coefficients, = struct.unpack_from('I', data, offset)
                     #print("Blend shapes count="+ str(n_coefficients) )
@@ -160,17 +155,9 @@ class faceshiftRcv :
                     trackMsg.m_eyeGazeRightPitch=reye_theta
                     trackMsg.m_eyeGazeRightYaw=reye_phi
                 elif(block_id == 105):     # Markers block (absolute position of mark points)
+                    #ignore this block for now
                     n_markers, = struct.unpack_from('H', data, offset)
-                    #print("n markers="+str(n_markers))
-                    i = 0
-                    trackMsg.m_markers = []
-                    while(i < n_markers):
-                        # Offset of the block, plus the 2 bytes for int n_markers, plus 4 bytes for each x,y,z floats
-                        x, y, z = struct.unpack_from('fff', data, offset + 2 + (i*4*3))
-                        #print("m" + str(i) + " " + str(x) + "\t" + str(y) + "\t" + str(z))
-                        trackMsg.m_markers.append(mathutils.Vector((x,y,z)))
-                        i += 1
-            
+
                 curr_block += 1
                 offset += block_size
             self.updated=True
@@ -220,16 +207,19 @@ class faceshiftRcv :
 
 
 if __name__ == "__main__":
-    pub = rospy.Publisher('faceshift_track', fsMsgTrackingState, queue_size=10)
+    pub = rospy.Publisher('faceshift_track', pau, queue_size=10)
     rospy.init_node('fs_ros', anonymous=True)
     r = rospy.Rate(60) # 10hz
     fs=faceshiftRcv()
     fs.start_sock()
-    fs.updated=False 
+    fs.updated=False
+    fs.track_ok = 0
     while not rospy.is_shutdown():
         fs.rcvr()
-        if (fs.updated):
+        # Only succesfully tracked messages to be sent
+        if (fs.updated and fs.track_ok > 0):
             pub.publish(trackMsg)
             fs.updated=False
+            fs.track_ok = 0
         r.sleep()
     
