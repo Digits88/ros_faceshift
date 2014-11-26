@@ -1,15 +1,12 @@
 #!/usr/bin/env python
 
 import rospy
-
-
 import socket
 import math
-
 import copy
-
 import struct
 
+import ShapekeyStore
 from pau2motors.msg import pau
 
 trackMsg=pau()
@@ -24,56 +21,61 @@ UPDATE_DELAY = 0.04
 
 
 # These are the names of the FaceShift control channels
+#updated mapping for 2014.1
+
 blend_shape_names = [
-    "EyeBlink_L",
-    "EyeBlink_R",
-    "EyeSquint_L",
-    "EyeSquint_R",
-    "EyeDown_L",
-    "EyeDown_R",
-    "EyeIn_L",
-    "EyeIn_R",
-    "EyeOpen_L",
-    "EyeOpen_R",
-    "EyeOut_L",
-    "EyeOut_R",
-    "EyeUp_L",
-    "EyeUp_R",
-    "BrowsD_L",
-    "BrowsD_R",
-    "BrowsU_C",
-    "BrowsU_L",
-    "BrowsU_R",
-    "JawFwd",
-    "JawLeft",
-    "JawOpen",
-    "JawChew",
-    "JawRight",
-    "MouthLeft",
-    "MouthRight",
-    "MouthFrown_L",
-    "MouthFrown_R",
-    "MouthSmile_L",
-    "MouthSmile_R",
-    "MouthDimple_L",
-    "MouthDimple_R",
-    "LipsStretch_L",
-    "LipsStretch_R",
-    "LipsUpperClose",
-    "LipsLowerClose",
-    "LipsUpperUp",
-    "LipsLowerDown",
-    "LipsUpperOpen",
-    "LipsLowerOpen",
-    "LipsFunnel",
-    "LipsPucker",
-    "ChinLowerRaise",
-    "ChinUpperRaise",
-    "Sneer",
-    "Puff",
-    "CheekSquint_L",
-    "CheekSquint_R"]
-    
+    "00_EyeBlink_L",
+    "01_EyeBlink_R",
+    "02_EyeSquint_L",
+    "03_EyeSquint_R",
+    "04_EyeDown_L",
+    "05_EyeDown_R",
+    "06_EyeIn_L",
+    "07_EyeIn_R",
+    "08_EyeOpen_L",
+    "09_EyeOpen_R",
+    "10_EyeOut_L",
+    "11_EyeOut_R",
+    "12_EyeUp_L",
+    "13_EyeUp_R",
+    "14_BrowsD_L",
+    "15_BrowsD_R",
+    "16_BrowsU_C",
+    "17_BrowsU_L",
+    "18_BrowsU_R",
+    "21_JawOpen",
+    "___LipsTogether"
+    "20_JawLeft",
+    "23_JawRight",
+    "19_JawFwd",
+    "361_LipsUpperUp_L",  # Lips had major changes in new faceshift version
+    "362_LipsUpperUp_R",
+    "371_LipsLowerDown_L",
+    "372_LipsLowerDown_R",
+    "34_LipsUpperClose",
+    "35_LipsLowerClose",
+    "28_MouthSmile_L",
+    "29_MouthSmile_R",
+    "30_MouthDimple_L",
+    "31_MouthDimple_R",
+    "32_LipsStretch_L",
+    "33_LipsStretch_R",
+    "26_MouthFrown_L",
+    "27_MouthFrown_R",
+    "___MouthPress_L"
+    "___MouthPress_R"
+    "41_LipsPucker",
+    "40_LipsFunnel",
+    "24_MouthLeft",
+    "25_MouthRight",
+    "42_ChinLowerRaise",
+    "43_ChinUpperRaise",
+    "441_Sneer_L",
+    "442_Sneer_R",
+    "45_Puff",
+    "46_CheekSquint_L",
+    "47_CheekSquint_R"]
+#
 
 
 #def talker():
@@ -86,7 +88,7 @@ blend_shape_names = [
 #           pub.publish(str)
 #           r.sleep()
 
-                
+
 
 class faceshiftRcv :
     """This is the receiving Thread listening for FaceShift UDP messages on some port."""
@@ -180,7 +182,29 @@ class faceshiftRcv :
                     self.sock.close()
                     self.sock = None
                     
-            return 
+            return
+    # map recieved messages to shapekeystore used
+    def map_pau(selfself, trackMsg):
+        #  Final Message to be sent. Currently only m_coeffs has to be remapped
+        msg = pau()
+        #eyes and head remains same.
+        msg.m_headRotation = trackMsg.m_headRotation
+        msg.m_eyeGazeLeftPitch = trackMsg.m_eyeGazeLeftPitch
+        msg.m_eyeGazeLeftYaw = trackMsg.m_eyeGazeLeftYaw
+        msg.m_eyeGazeRightYaw = trackMsg.m_eyeGazeRightYaw
+        msg.m_eyeGazeRightPitch = trackMsg.m_eyeGazeRightPitch
+        # Empty m_coeffs
+        msg.m_coeffs = [0]*ShapekeyStore.getLength()
+        # Map by shapekey number
+        ids = [e[:3] for e in blend_shape_names]
+        ids_pau = [e[:3] for e in ShapekeyStore.getList()]
+        trackMsg.m_coeffs.__len__()
+        #function to return the value based on shapekey nubmer
+        for i, id in enumerate(ids_pau):
+            if (id in ids):
+                msg.m_coeffs[i] = trackMsg.m_coeffs[ids.index(id)]
+        return msg
+
 
     def start_sock(self):
         try:
@@ -218,6 +242,7 @@ if __name__ == "__main__":
         fs.rcvr()
         # Only succesfully tracked messages to be sent
         if (fs.updated and fs.track_ok > 0):
+            trackMsg = fs.map_pau(trackMsg)
             pub.publish(trackMsg)
             fs.updated=False
             fs.track_ok = 0
