@@ -5,7 +5,7 @@ import socket
 import math
 import copy
 import struct
-
+import pprint
 import ShapekeyStore
 from pau2motors.msg import pau
 
@@ -44,7 +44,7 @@ blend_shape_names = [
     "17_BrowsU_L",
     "18_BrowsU_R",
     "21_JawOpen",
-    "___LipsTogether"
+    "90_LipsTogether",
     "20_JawLeft",
     "23_JawRight",
     "19_JawFwd",
@@ -62,8 +62,8 @@ blend_shape_names = [
     "33_LipsStretch_R",
     "26_MouthFrown_L",
     "27_MouthFrown_R",
-    "___MouthPress_L"
-    "___MouthPress_R"
+    "91_MouthPress_L",
+    "92_MouthPress_R",
     "41_LipsPucker",
     "40_LipsFunnel",
     "24_MouthLeft",
@@ -79,7 +79,7 @@ blend_shape_names = [
 
 
 #def talker():
-#       pub = rospy.Publisher('faceshift_track', trackMsg, queue_size=10)
+#       pub = rospy.Publisher('/dmitry/faceshift_track', trackMsg, queue_size=10)
 #       rospy.init_node('fs_ros', anonymous=True)
 #       r = rospy.Rate(10) # 10hz
 #       while not rospy.is_shutdown():
@@ -101,7 +101,7 @@ class faceshiftRcv :
     
         # block_id = struct.unpack_from('H', data)
         # print("Received block id " + str(block_id)) ;
-
+	
         offset = 0
         block_id, version, block_size = struct.unpack_from('HHI', data, offset)
      
@@ -132,9 +132,9 @@ class faceshiftRcv :
                 elif(block_id == 102):      # Pose block (head rotation and position)
                     x,y,z,w = struct.unpack_from('ffff', data, offset)
 
-                    trackMsg.m_headRotation.x = x
+                    trackMsg.m_headRotation.x = z
                     trackMsg.m_headRotation.y = y
-                    trackMsg.m_headRotation.z = z
+                    trackMsg.m_headRotation.z = 0.0-x
                     trackMsg.m_headRotation.w = w
 
                 elif(block_id == 103):      # Blendshapes block (blendshape values)
@@ -154,8 +154,8 @@ class faceshiftRcv :
                     leye_theta, leye_phi, reye_theta, reye_phi = struct.unpack_from('ffff', data, offset)
                     trackMsg.m_eyeGazeLeftPitch=leye_theta
                     trackMsg.m_eyeGazeLeftYaw=leye_phi
-                    trackMsg.m_eyeGazeRightPitch=reye_theta
-                    trackMsg.m_eyeGazeRightYaw=reye_phi
+                    trackMsg.m_eyeGazeRightPitch=leye_theta
+                    trackMsg.m_eyeGazeRightYaw=leye_phi
                 elif(block_id == 105):     # Markers block (absolute position of mark points)
                     #ignore this block for now
                     n_markers, = struct.unpack_from('H', data, offset)
@@ -199,10 +199,29 @@ class faceshiftRcv :
         ids = [e[:3] for e in blend_shape_names]
         ids_pau = [e[:3] for e in ShapekeyStore.getList()]
         trackMsg.m_coeffs.__len__()
-        #function to return the value based on shapekey nubmer
+        # function to return the value based on shapekey nubmer
+    	new_coeffs = [0]*ShapekeyStore.getLength()
         for i, id in enumerate(ids_pau):
             if (id in ids):
-                msg.m_coeffs[i] = trackMsg.m_coeffs[ids.index(id)]
+                new_coeffs[i] = trackMsg.m_coeffs[ids.index(id)]
+                print("i to id",i,ids.index(id))
+        # Make it more realistic for untracked faces and with current mapping
+        # Smile
+        i = ShapekeyStore.getIndex('28_MouthSmile_L')
+        new_coeffs[i] = min(new_coeffs[i]*2,1.0)
+        new_coeffs[i+1] = min(new_coeffs[i+1]*2,1.0)
+        # eye_brows
+        i = ShapekeyStore.getIndex('00_EyeBlink_L')
+        new_coeffs[i] = max(new_coeffs[i]-0.3,0.0)*2
+        new_coeffs[i+1] = max(new_coeffs[i+1]-0.3,0.0)*2
+        i = ShapekeyStore.getIndex('08_EyeOpen_L')
+        new_coeffs[i] = 0
+        new_coeffs[i+1] = 0
+
+        msg.m_coeffs = new_coeffs
+        	
+
+
         return msg
 
 
@@ -231,7 +250,7 @@ class faceshiftRcv :
 
 
 if __name__ == "__main__":
-    pub = rospy.Publisher('faceshift_track', pau, queue_size=10)
+    pub = rospy.Publisher('/dmitry/faceshift_track', pau, queue_size=10)
     rospy.init_node('fs_ros', anonymous=True)
     r = rospy.Rate(60) # 10hz
     fs=faceshiftRcv()
