@@ -24,8 +24,8 @@ UPDATE_DELAY = 0.04
 #updated mapping for 2014.1
 
 blend_shape_names = [
-    "00_EyeBlink_L",
-    "01_EyeBlink_R",
+    "eye-blink.UP.L",
+    "eye-blink.UP.R",
     "02_EyeSquint_L",
     "03_EyeSquint_R",
     "04_EyeDown_L",
@@ -38,30 +38,30 @@ blend_shape_names = [
     "11_EyeOut_R",
     "12_EyeUp_L",
     "13_EyeUp_R",
-    "14_BrowsD_L",
-    "15_BrowsD_R",
-    "16_BrowsU_C",
-    "17_BrowsU_L",
-    "18_BrowsU_R",
-    "21_JawOpen",
+    "brow_inner_DN.L",
+    "brow_inner_DN.R",
+    "brow_center_UP",
+    "brow_inner_UP.L",
+    "brow_inner_UP.R",
+    "jaw",
     "90_LipsTogether",
     "20_JawLeft",
     "23_JawRight",
     "19_JawFwd",
-    "361_LipsUpperUp_L",  # Lips had major changes in new faceshift version
-    "362_LipsUpperUp_R",
-    "371_LipsLowerDown_L",
-    "372_LipsLowerDown_R",
+    "lip.UP.L",  # Lips had major changes in new faceshift version
+    "lip.UP.R",
+    "lip.DN.L",
+    "lip.DN.R",
     "34_LipsUpperClose",
     "35_LipsLowerClose",
-    "28_MouthSmile_L",
-    "29_MouthSmile_R",
+    "lips-smile.L",
+    "lips-smile.R",
     "30_MouthDimple_L",
     "31_MouthDimple_R",
     "32_LipsStretch_L",
     "33_LipsStretch_R",
-    "26_MouthFrown_L",
-    "27_MouthFrown_R",
+    "lips-frown.L",
+    "lips-frown.R",
     "91_MouthPress_L",
     "92_MouthPress_R",
     "41_LipsPucker",
@@ -70,8 +70,8 @@ blend_shape_names = [
     "25_MouthRight",
     "42_ChinLowerRaise",
     "43_ChinUpperRaise",
-    "441_Sneer_L",
-    "442_Sneer_R",
+    "sneer.L",
+    "sneer.R",
     "45_Puff",
     "46_CheekSquint_L",
     "47_CheekSquint_R"]
@@ -188,39 +188,29 @@ class faceshiftRcv :
         #  Final Message to be sent. Currently only m_coeffs has to be remapped
         msg = pau()
         #eyes and head remains same.
-        msg.m_headRotation = trackMsg.m_headRotation
+        msg.m_headRotation = copy.deepcopy(trackMsg.m_headRotation)
+        # Correction
+        msg.m_headRotation.y = -trackMsg.m_headRotation.z
+        msg.m_headRotation.z = trackMsg.m_headRotation.y
+        msg.m_headRotation.x = trackMsg.m_headRotation.x
+
+        
         msg.m_eyeGazeLeftPitch = trackMsg.m_eyeGazeLeftPitch
         msg.m_eyeGazeLeftYaw = trackMsg.m_eyeGazeLeftYaw
         msg.m_eyeGazeRightYaw = trackMsg.m_eyeGazeRightYaw
         msg.m_eyeGazeRightPitch = trackMsg.m_eyeGazeRightPitch
         # Empty m_coeffs
         msg.m_coeffs = [0]*ShapekeyStore.getLength()
-        # Map by shapekey number
-        ids = [e[:3] for e in blend_shape_names]
-        ids_pau = [e[:3] for e in ShapekeyStore.getList()]
-        trackMsg.m_coeffs.__len__()
-        # function to return the value based on shapekey nubmer
-    	new_coeffs = [0]*ShapekeyStore.getLength()
-        for i, id in enumerate(ids_pau):
-            if (id in ids):
-                new_coeffs[i] = trackMsg.m_coeffs[ids.index(id)]
-                print("i to id",i,ids.index(id))
-        # Make it more realistic for untracked faces and with current mapping
-        # Smile
-        i = ShapekeyStore.getIndex('28_MouthSmile_L')
-        new_coeffs[i] = min(new_coeffs[i]*2,1.0)
-        new_coeffs[i+1] = min(new_coeffs[i+1]*2,1.0)
-        # eye_brows
-        i = ShapekeyStore.getIndex('00_EyeBlink_L')
-        new_coeffs[i] = max(new_coeffs[i]-0.3,0.0)*2
-        new_coeffs[i+1] = max(new_coeffs[i+1]-0.3,0.0)*2
-        i = ShapekeyStore.getIndex('08_EyeOpen_L')
-        new_coeffs[i] = 0
-        new_coeffs[i+1] = 0
-
-        msg.m_coeffs = new_coeffs
-        	
-
+        # Map by shapekeys
+        fs = trackMsg.m_coeffs
+        for i,sk in enumerate(ShapekeyStore.getList()):
+            if sk in blend_shape_names:
+                msg.m_coeffs[i] = fs[blend_shape_names.index(sk)]
+        # Outer brows are same as inner
+        msg.m_coeffs[5] = msg.m_coeffs[3]
+        msg.m_coeffs[6] = msg.m_coeffs[4]
+        msg.m_coeffs[10] = msg.m_coeffs[8]
+        msg.m_coeffs[11] = msg.m_coeffs[9]
 
         return msg
 
@@ -250,7 +240,8 @@ class faceshiftRcv :
 
 
 if __name__ == "__main__":
-    pub = rospy.Publisher('/dmitry/faceshift_track', pau, queue_size=10)
+    pub = rospy.Publisher('/fritz/no_pau', pau, queue_size=10)
+    neck_pub = rospy.Publisher('/fritz/cmd_neck_pau', pau, queue_size=10)
     rospy.init_node('fs_ros', anonymous=True)
     r = rospy.Rate(60) # 10hz
     fs=faceshiftRcv()
@@ -263,6 +254,7 @@ if __name__ == "__main__":
         if (fs.updated and fs.track_ok > 0):
             trackMsg = fs.map_pau(trackMsg)
             pub.publish(trackMsg)
+            neck_pub.publish(trackMsg)
             fs.updated=False
             fs.track_ok = 0
         r.sleep()
