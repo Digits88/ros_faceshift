@@ -190,15 +190,15 @@ class faceshiftRcv :
         #eyes and head remains same.
         msg.m_headRotation = copy.deepcopy(trackMsg.m_headRotation)
         # Correction
-        msg.m_headRotation.y = -trackMsg.m_headRotation.z
-        msg.m_headRotation.z = trackMsg.m_headRotation.y
-        msg.m_headRotation.x = trackMsg.m_headRotation.x
+        msg.m_headRotation.y = trackMsg.m_headRotation.x
+        msg.m_headRotation.z = -trackMsg.m_headRotation.y
+        msg.m_headRotation.x = -trackMsg.m_headRotation.z
 
         
-        msg.m_eyeGazeLeftPitch = trackMsg.m_eyeGazeLeftPitch
-        msg.m_eyeGazeLeftYaw = trackMsg.m_eyeGazeLeftYaw
-        msg.m_eyeGazeRightYaw = trackMsg.m_eyeGazeRightYaw
-        msg.m_eyeGazeRightPitch = trackMsg.m_eyeGazeRightPitch
+        msg.m_eyeGazeLeftPitch = math.radians(trackMsg.m_eyeGazeLeftPitch)
+        msg.m_eyeGazeLeftYaw = math.radians(trackMsg.m_eyeGazeLeftYaw)
+        msg.m_eyeGazeRightYaw = math.radians(trackMsg.m_eyeGazeRightYaw)
+        msg.m_eyeGazeRightPitch = math.radians(trackMsg.m_eyeGazeRightPitch)
         # Empty m_coeffs
         msg.m_coeffs = [0]*ShapekeyStore.getLength()
         # Map by shapekeys
@@ -240,8 +240,8 @@ class faceshiftRcv :
 
 
 if __name__ == "__main__":
-    pub = rospy.Publisher('/fritz/no_pau', pau, queue_size=10)
-    neck_pub = rospy.Publisher('/fritz/cmd_neck_pau', pau, queue_size=10)
+    pub = rospy.Publisher('no_pau', pau, queue_size=10)
+    neck_pub = rospy.Publisher('cmd_neck_pau', pau, queue_size=10)
     rospy.init_node('fs_ros', anonymous=True)
     r = rospy.Rate(60) # 10hz
     fs=faceshiftRcv()
